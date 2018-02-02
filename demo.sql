@@ -66,14 +66,6 @@ select
 	s.duration = d. duration
 	where d.modified is null;
 
---do update from select
-UPDATE   books
-SET books.primary_author = authors.name
-FROM   books
-INNER JOIN authors ON   books.author_id = authors.id
-WHERE books.title = 'The Hobbit'
-
-
 update d_music
 set modified = date('now')
 from d_music 

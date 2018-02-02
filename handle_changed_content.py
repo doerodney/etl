@@ -6,14 +6,6 @@ def run(event, context):
     start = datetime.datetime.now()
     process_date = str(datetime.date.today())
 
-    # Discovers rows that have been deleted from staging and as such
-    # must be marked as deactivated in the dimension.
-    select_dim_rows_to_deactivate = '''
-    select composer, title, duration from d_music where modified is null
-    except
-    select composer, title, duration from s_music
-    '''
-
     # Discovers rows that must be modified in the dimension.
     select_dim_rows_to_modify_sql = '''
     select composer, title, duration from d_music where modified is null
@@ -22,8 +14,8 @@ def run(event, context):
         d.composer,
         d.title,
         d.duration
-    from s_music s
-    inner join d_music d on
+    from d_music d
+    inner join s_music s on
     s.composer = d.composer and
     s.title = d.title and
     s.duration = d. duration
@@ -110,7 +102,7 @@ def run(event, context):
 
     new_rows = cur.fetchall()
     count_new_rows = len(new_rows)
-    
+
     if count_new_rows > 0:
         for row in new_rows:
             composer, title, duration = row
