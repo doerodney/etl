@@ -35,8 +35,8 @@ values
 
 --Discover new records in staged data table that are NOT 
 --in the dimension table.
-insert into d_music (composer, title, duration)
-select composer, title, duration from s_music
+insert into d_music (composer, title, duration, created)
+select composer, title, duration, datetime('now') s_music
 except
 select 
 	d.composer,
@@ -48,6 +48,24 @@ select
 	s.title = d.title and
 	s.duration = d. duration
 	where d.modified is null;
+
+--This does the same thing with a left join in lieu of except.
+insert  into d_music(composer, title, duration, created)
+select 
+	s.composer,
+	s.title,
+	s.duration,
+	datetime('now'),
+	d.composer,
+	d.title,
+	d.duration
+from s_music s
+left join d_music d on s.composer = d.composer and s.title = d.title and s.duration = d.duration
+where d.composer is null and d.title is null and d.duration is null
+
+--The postgres query plan for both of these tactics does not show a clear
+--advantage to either approach.
+
 
 --Update a row in staged data.	
 update s_music set duration = '5:12' where title = 'Air on a G String';
@@ -66,8 +84,10 @@ select
 	s.duration = d. duration
 	where d.modified is null;
 
+
+
 update d_music
-set modified = date('now')
+set modified = datetime('now')
 from d_music 
 select composer, title, duration
 except
