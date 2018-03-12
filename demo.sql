@@ -1,4 +1,6 @@
 --create staged data table
+drop table if exists s_music;
+
 create table s_music(
 	id integer not null primary key autoincrement,
 	composer text not null,
@@ -7,6 +9,8 @@ create table s_music(
 );
 
 --create dimension table
+drop table if exists d_music;
+
 create table d_music(
 	dim_music_id integer not null primary key autoincrement,
 	composer text not null,
@@ -24,14 +28,8 @@ values
 ('Chopin', 'Ballade No. 1', '8:19'),
 ('Pachelbel', 'Canon in D', '5:10'),
 ('Debussy', 'Claire de Lune', '4:46'),
-('Janacek', 'Idyl for Strings', '5:38'),
-('Beethoven', 'Moonlight Sonata', '6:38'),
-('Mendelssohn', 'Songs Without Words', '2:54'),
-('Tchaikovsky', 'Swan Lake (excerpt)', '7:11'),
-('Beethoven', 'Pathetique Sonata', '5:16'),
-('Prokofiev', 'Romeo and Juliet', '3:42'),
-('Saint-Saens', 'Aquarium', '2:13'),
-('The Cranberries', 'Linger', '4:35');
+('Janacek', 'Idyl for Strings', '5:38')
+
 
 --Discover new records in staged data table that are NOT 
 --in the dimension table.
@@ -49,19 +47,22 @@ select
 	s.duration = d. duration
 	where d.modified is null;
 
+--Discover new records in staged data table that are NOT 
+--in the dimension table.
 --This does the same thing with a left join in lieu of except.
-insert  into d_music(composer, title, duration, created)
+insert into d_music (composer, title, duration, created)
 select 
 	s.composer,
 	s.title,
 	s.duration,
-	datetime('now'),
-	d.composer,
-	d.title,
-	d.duration
+	datetime('now')
 from s_music s
-left join d_music d on s.composer = d.composer and s.title = d.title and s.duration = d.duration
-where d.composer is null and d.title is null and d.duration is null
+left join d_music d
+on d.composer = s.composer
+and d.title = s.title
+and d.duration = s.duration
+where d.composer is null  --because of failed left join
+and d.modified is null  -- only want active dimension rows
 
 --The postgres query plan for both of these tactics does not show a clear
 --advantage to either approach.
@@ -84,6 +85,29 @@ select
 	s.duration = d. duration
 	where d.modified is null;
 
+--Handle modified content.
+update d_music set modified = datetime('now') where dim_music_id in
+(
+	select 
+		d.dim_music_id	 
+	from d_music d
+	left join s_music s on d.title = s.title 
+	and d.composer = s.composer 
+	and d.duration = s.duration
+	where s.composer is null -- because of failed left join
+	and d.modified is null  -- to detect active rows  
+) 
+
+-- Insert new rows into staged data. 
+insert into s_music (composer, title, duration)
+values
+('Beethoven', 'Moonlight Sonata', '6:38'),
+('Mendelssohn', 'Songs Without Words', '2:54'),
+('Tchaikovsky', 'Swan Lake (excerpt)', '7:11'),
+('Beethoven', 'Pathetique Sonata', '5:16'),
+('Prokofiev', 'Romeo and Juliet', '3:42'),
+('Saint-Saens', 'Aquarium', '2:13'),
+('The Cranberries', 'Linger', '4:35');
 
 
 update d_music
@@ -145,5 +169,144 @@ where modified is null
 except
 select composer, title, duration from s_music s;
 
+--Session transcript:
+
+--Add content to staged data.
+insert into s_music (composer, title, duration)
+values
+('Tchaikovsky', 'Nocturne in F', '5:31'),
+('J.S. Bach', 'Air on a G String', '5:10'),
+('Chopin', 'Ballade No. 1', '8:19'),
+('Pachelbel', 'Canon in D', '5:10'),
+('Debussy', 'Claire de Lune', '4:46'),
+('Janacek', 'Idyl for Strings', '5:38')
+
+--Add staged content to dimension.
+insert into d_music (composer, title, duration, created)
+select
+	s.composer,
+	s.title,
+	s.duration,
+	datetime('now')
+from s_music s
+left join d_music d
+on d.composer = s.composer
+and d.title = s.title
+and d.duration = s.duration
+where d.composer is null
+and d.modified is null
+
+
+insert into d_music (composer, title, duration, created)
+select
+	s.composer,
+	s.title,
+	s.duration,
+	datetime('now')
+from s_music s
+left join d_music d
+on d.composer = s.composer
+and d.title = s.title
+and d.duration = s.duration
+where d.composer is null
+and d.modified is null
+
+update s_music set duration = '5:12' where title = 'Air on a G String';
+select
+	d.dim_music_id
+	,s.composer
+	,s.title
+	,s.duration
+from d_music d
+left join s_music s on d.title = s.title
+and d.composer = s.composer
+and d.duration = s.duration
+where s.composer is null
+and d.modified is null;
+
+select
+	d.dim_music_id
+from d_music d
+left join s_music s on d.title = s.title
+and d.composer = s.composer
+and d.duration = s.duration
+where s.composer is null
+and d.modified is null;
+
+update d_music set modified = datetime('now') where dim_music_id in
+(
+	select
+		d.dim_music_id
+	from d_music d
+	left join s_music s on d.title = s.title
+	and d.composer = s.composer
+	and d.duration = s.duration
+	where s.composer is null
+	and d.modified is null
+)
+
+update d_music set modified = datetime('now') where dim_music_id in
+(
+	select
+		d.dim_music_id
+	from d_music d
+	left join s_music s on d.title = s.title
+	and d.composer = s.composer
+	and d.duration = s.duration
+	where s.composer is null
+	and d.modified is null
+)
+
+select
+	s.composer,
+	s.title,
+	s.duration,
+	datetime('now')
+from s_music s
+left join d_music d
+on d.composer = s.composer
+and d.title = s.title
+and d.duration = s.duration
+where d.composer is null
+and d.modified is null
+
+insert into d_music (composer, title, duration, created)
+select
+	s.composer,
+	s.title,
+	s.duration,
+	datetime('now')
+from s_music s
+left join d_music d
+on d.composer = s.composer
+and d.title = s.title
+and d.duration = s.duration
+where d.composer is null
+and d.modified is null
+insert into s_music (composer, title, duration)
+values
+('Beethoven', 'Moonlight Sonata', '6:38'),
+('Mendelssohn', 'Songs Without Words', '2:54'),
+('Tchaikovsky', 'Swan Lake (excerpt)', '7:11'),
+('Beethoven', 'Pathetique Sonata', '5:16'),
+('Prokofiev', 'Romeo and Juliet', '3:42'),
+('Saint-Saens', 'Aquarium', '2:13'),
+('The Cranberries', 'Linger', '4:35');
+
+update s_music set duration = '5:12' where title = 'Air on a G String';
+
+insert into d_music (composer, title, duration, created)
+select
+	s.composer,
+	s.title,
+	s.duration,
+	datetime('now')
+from s_music s
+left join d_music d
+on d.composer = s.composer
+and d.title = s.title
+and d.duration = s.duration
+where d.composer is null
+and d.modified is null
 
  
