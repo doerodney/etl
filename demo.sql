@@ -1,3 +1,5 @@
+--Slowly-changing dimension ETL demo using Sqlite3
+
 --create staged data table
 drop table if exists s_music;
 
@@ -33,8 +35,7 @@ values
 
 --Discover new records in staged data table that are NOT 
 --in the dimension table.
-insert into d_music (composer, title, duration, created)
-select composer, title, duration, datetime('now') s_music
+select composer, title, duration from s_music
 except
 select 
 	d.composer,
@@ -45,10 +46,11 @@ select
 	s.composer = d.composer and
 	s.title = d.title and
 	s.duration = d. duration
-	where d.modified is null;
+	where d.modified is null;  --only want active dimension rows
 
+--Do the same as above a different way...
 --Discover new records in staged data table that are NOT 
---in the dimension table.
+--in the dimension table, and insert them into the dimension.
 --This does the same thing with a left join in lieu of except.
 insert into d_music (composer, title, duration, created)
 select 
@@ -62,7 +64,7 @@ on d.composer = s.composer
 and d.title = s.title
 and d.duration = s.duration
 where d.composer is null  --because of failed left join
-and d.modified is null  -- only want active dimension rows
+and d.modified is null  --only want active dimension rows
 
 --The postgres query plan for both of these tactics does not show a clear
 --advantage to either approach.
@@ -169,8 +171,6 @@ where modified is null
 except
 select composer, title, duration from s_music s;
 
---Session transcript:
-
 --Add content to staged data.
 insert into s_music (composer, title, duration)
 values
@@ -181,7 +181,8 @@ values
 ('Debussy', 'Claire de Lune', '4:46'),
 ('Janacek', 'Idyl for Strings', '5:38')
 
---Add staged content to dimension.
+--Add staged content to dimension using an anti-join
+--implemented with a left joi..
 insert into d_music (composer, title, duration, created)
 select
 	s.composer,
@@ -197,21 +198,10 @@ where d.composer is null
 and d.modified is null
 
 
-insert into d_music (composer, title, duration, created)
-select
-	s.composer,
-	s.title,
-	s.duration,
-	datetime('now')
-from s_music s
-left join d_music d
-on d.composer = s.composer
-and d.title = s.title
-and d.duration = s.duration
-where d.composer is null
-and d.modified is null
-
+--Change a value in the staged data.
 update s_music set duration = '5:12' where title = 'Air on a G String';
+
+--Identify the dimension content that must be changed.
 select
 	d.dim_music_id
 	,s.composer
@@ -224,6 +214,7 @@ and d.duration = s.duration
 where s.composer is null
 and d.modified is null;
 
+--Identify only the dimension identifier for the row(s) that must be deactivated. 
 select
 	d.dim_music_id
 from d_music d
@@ -233,6 +224,7 @@ and d.duration = s.duration
 where s.composer is null
 and d.modified is null;
 
+--Deactivate the row(s).
 update d_music set modified = datetime('now') where dim_music_id in
 (
 	select
@@ -245,31 +237,7 @@ update d_music set modified = datetime('now') where dim_music_id in
 	and d.modified is null
 )
 
-update d_music set modified = datetime('now') where dim_music_id in
-(
-	select
-		d.dim_music_id
-	from d_music d
-	left join s_music s on d.title = s.title
-	and d.composer = s.composer
-	and d.duration = s.duration
-	where s.composer is null
-	and d.modified is null
-)
-
-select
-	s.composer,
-	s.title,
-	s.duration,
-	datetime('now')
-from s_music s
-left join d_music d
-on d.composer = s.composer
-and d.title = s.title
-and d.duration = s.duration
-where d.composer is null
-and d.modified is null
-
+--insert the new content into the dimension.
 insert into d_music (composer, title, duration, created)
 select
 	s.composer,

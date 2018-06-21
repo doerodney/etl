@@ -20,7 +20,17 @@ create table d_music(
 	modified text
 );
 
---Handle modified content:
+--Insert new staged content:
+insert into s_music (composer, title, duration)
+values
+('Tchaikovsky', 'Nocturne in F', '5:31'),
+('J.S. Bach', 'Air on a G String', '5:10'),
+('Chopin', 'Ballade No. 1', '8:19'),
+('Pachelbel', 'Canon in D', '5:10'),
+('Debussy', 'Claire de Lune', '4:46'),
+('Janacek', 'Idyl for Strings', '5:38')
+
+--Handle active modified content:  (left join is one way to do an anti-join)
 update d_music set modified = datetime('now') where dim_music_id in
 (
 	select
@@ -33,7 +43,7 @@ update d_music set modified = datetime('now') where dim_music_id in
 	and d.modified is null
 )
 
---Handle new content:
+--Handle new content:  (inner join with except is another way to do an anti-join)
 insert into d_music (composer, title, duration, created)
 select composer, title, duration, datetime('now') as created from
 (
@@ -51,24 +61,10 @@ select composer, title, duration, datetime('now') as created from
         where d.modified is null
 ) as x
 
---Insert new staged content:
-insert into s_music (composer, title, duration)
-values
-('Tchaikovsky', 'Nocturne in F', '5:31'),
-('J.S. Bach', 'Air on a G String', '5:10'),
-('Chopin', 'Ballade No. 1', '8:19'),
-('Pachelbel', 'Canon in D', '5:10'),
-('Debussy', 'Claire de Lune', '4:46'),
-('Janacek', 'Idyl for Strings', '5:38')
-
---Handle modified content:
-
---Handle new content:
-
 --Update staged data content:
 update s_music set duration = '5:12' where title = 'Air on a G String';
 
---Handle modified content:
+--Handle active modified content:
 
 --Handle new content:
 
@@ -86,6 +82,6 @@ values
 ('Saint-Saens', 'Aquarium', '2:13'),
 ('The Cranberries', 'Linger', '4:35')
 
---Handle modified content:
+--Handle active modified content:
 
 --Handle new content:
