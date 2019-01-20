@@ -15,15 +15,16 @@ def create_source_table(rows, columns, conn, cur):
 	drop_sql = 'drop table if exists %s;' % table_name
 	
 	
-	create_sql = 'create table %s(' % table_name
-	pkey sql = '  source_id integer autoincrement primary key,'
+	create_sql = 'create table %s(\n' % table_name
+	pkey_sql = '  source_id integer autoincrement primary key,\n'
 	column_sql_list = [
-		get_column_name(i) for i in range(columns)
+		'  %s numeric not null' % get_column_name(i) for i in range(columns)
 	]	
-	final_sql = ');'
+	final_sql = '\n);'
 	
-	sql = '%s, %s, %s' % (create_sql, ','.join(column_sql_list)', final_sql)
-
+	sql = '%s%s%s%s' % (create_sql, pkey_sql, ',\n'.join(column_sql_list), final_sql)
+	
+	print(sql)
 	
 
 
@@ -44,13 +45,13 @@ def run_test(rows, columns, conn, cur):
     start = datetime.datetime.now()
     process_date = str(datetime.date.today())
 
-    cur.close()
-    conn.close()
+    create_source_table(rows, columns, conn, cur)
 
     end = datetime.datetime.now()
     duration_ms = int(1000 * (end - start).total_seconds())
-    print('Processed %d changed rows and %d new rows in %d milliseconds.' % (count_changed_rows, count_new_rows, duration_ms))
+    print('Processed in %d milliseconds.' % duration_ms)
 
+												
 def main():
 	"""
 	Creates and loads a table of specified number of rows and columns.
@@ -79,9 +80,9 @@ def main():
 		for msg in sys.exc_info():
 				print(msg)
 
-	run_test(rows, columns, conn, cur)
+	run_test(args.rows, args.columns, conn, cur)
 	cur.close()
-  conn.close()
+	conn.close()
 
 		
 if __name__ == '__main__':
