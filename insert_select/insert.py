@@ -7,25 +7,51 @@ import sqlite3
 def create_dest_table(rows, columns, conn, cur):
     pass
 
-
+  
 def create_source_table(rows, columns, conn, cur):
     table_name = 'source'
+    success = create_table(table_name, columns, conn, cur)
+    print('Create table %s success: %s' % (table_name, str(success)) ) 
+
     
-    # delete the table if it exists.
+def create_table(table_name, column_count, conn, cur, drop_if_exists=False):
+    success = True
+    id_column = '%s_id' % table_name
+    
+    # drops the table if it exists.
     drop_sql = 'drop table if exists %s;' % table_name
-    
-    
-    create_sql = 'create table %s(\n' % table_name
-    pkey_sql = '  %s integer autoincrement primary key,\n' % get_source_table_id_column_name()
-    column_sql_list = [
-        '  %s numeric not null' % get_column_name(i) for i in range(columns)
-    ]   
-    final_sql = '\n);'
-    
-    sql = '%s%s%s%s' % (create_sql, pkey_sql, ',\n'.join(column_sql_list), final_sql)
-    
-    print(sql)
-    
+    try:
+        cur.execute(drop_sql)
+        conn.commit()
+        
+    except sqlite3.Error as e:
+        print(e)
+        print(drop_sql)
+        print('Cannot drop table %s.' % table_name)
+        success = False
+        
+    if success:
+        # creates the table.
+        create_sql = 'create table %s(\n' % table_name
+        pkey_sql = '  %s integer not null primary key autoincrement,\n' % id_column
+        column_sql_list = [
+            '  %s numeric not null' % get_column_name(i) for i in range(column_count)
+        ]   
+        final_sql = '\n);'
+
+        sql = '%s%s%s%s' % (create_sql, pkey_sql, ',\n'.join(column_sql_list), final_sql)
+
+        try:
+            cur.execute(sql)
+            conn.commit()
+            
+        except sqlite3.Error as e:
+            print(e)
+            print(sql)
+            print('Cannot create table %s.' % table_name)
+            success = False
+
+    return success
 
 def get_column_name(index):
     name = 'column%d' % index
