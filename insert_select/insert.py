@@ -1,5 +1,6 @@
 import argparse
 import datetime
+import random
 import sys
 import sqlite3
 
@@ -9,7 +10,7 @@ def create_dest_table(rows, columns, conn, cur):
 
   
 def create_source_table(rows, columns, conn, cur):
-    table_name = 'source'
+    table_name = get_source_table_name()
     success = create_table(table_name, columns, conn, cur)
     print('Create table %s success: %s' % (table_name, str(success)) ) 
 
@@ -58,13 +59,35 @@ def get_column_name(index):
     return name
 
 
-def get_source_table_id_column_name():
-    name = 'source_id'
+def get_source_table_name():
+    name = 'source'
     return name
 
 
-def load_source_table(rows, columns, conn, cur):
-    pass
+def load_source_table(row_count, column_count, conn, cur):
+    start = datetime.datetime.now()
+
+    insert_sql = 'insert into %s' % get_source_table_name()
+    column_list = [get_column_name(i) for i in range(column_count)]
+    column_list_sql = str(tuple(column_list))
+    values_list = []
+    for _ in range(row_count):
+        values = str(tuple([random.randint(0, 100) for _ in range(column_count)]))
+        values_list.append(values)
+
+    values_list_sql = ',\n'.join(values_list)
+
+    sql = '''
+    %s
+    %s
+    values
+    %s;''' % (insert_sql, column_list_sql, values_list_sql)
+
+    print(sql)
+
+    end = datetime.datetime.now()
+    duration_ms = int(1000 * (end - start).total_seconds())
+    print('Processed in %d milliseconds.' % duration_ms)
 
 
 def insert_into_dest_table(rows, columns, conn, cur):
